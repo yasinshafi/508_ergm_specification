@@ -1,0 +1,48 @@
+
+\begin{table}
+\caption{Results on network structure using exponential random graph models for the Swiss policy network and subsets thereof. The first model reports the ERGM presented in the article. The second, third, fourth and fifth models are run on a network with 5, 10, 15 or 20 nodes removed (respectfully; removed nodes are randomly selected).}
+\begin{center}
+\begin{footnotesize}
+\begin{tabular}{l D{.}{.}{4.5} D{.}{.}{4.5} D{.}{.}{4.5} D{.}{.}{4.4} D{.}{.}{4.5}}
+\toprule
+ & \multicolumn{1}{c}{Original (N=47)} & \multicolumn{1}{c}{90% (N=42)} & \multicolumn{1}{c}{79% (N=37)} & \multicolumn{1}{c}{68% (N=32)} & \multicolumn{1}{c}{57% (N=27)} \\
+\midrule
+Hypotheses                                           &             &             &             &            &            \\
+                                                     &             &             &             &            &            \\
+\quad Power concentration (gwidegree, H1)            & -1.11^{**}  & -1.19^{**}  & -1.23^{**}  & -1.14      & -1.57^{*}  \\
+                                                     & (0.34)      & (0.38)      & (0.42)      & (0.60)     & (0.62)     \\
+\quad Clustering (gwesp, H2)                         & 1.15^{***}  & 1.09^{***}  & 0.96^{***}  & 0.70^{**}  & 0.48^{*}   \\
+                                                     & (0.19)      & (0.20)      & (0.21)      & (0.25)     & (0.21)     \\
+\quad Collaboration with opponents (H2)              & 1.64^{*}    & 2.27^{**}   & 2.17^{**}   & 3.79       & 3.67       \\
+                                                     & (0.69)      & (0.75)      & (0.75)      & (2.04)     & (2.13)     \\
+\quad Collaboration across belief dissimilarity (H2) & -0.02       & 0.19        & 0.16        & 0.82       & 1.30       \\
+                                                     & (0.59)      & (0.63)      & (0.68)      & (2.19)     & (2.21)     \\
+\quad Interaction: Collab with opp. X belief dissim. & -0.04       & -0.27       & -0.23       & -1.06      & -1.46      \\
+                                                     & (0.52)      & (0.54)      & (0.58)      & (2.08)     & (2.13)     \\
+Controls                                             &             &             &             &            &            \\
+                                                     &             &             &             &            &            \\
+\quad Reciprocity                                    & 1.21^{***}  & 1.35^{***}  & 1.53^{***}  & 1.02       & 1.63^{***} \\
+                                                     & (0.26)      & (0.30)      & (0.31)      & (0.59)     & (0.47)     \\
+\quad Instrument preference dissimilarity            & -0.87^{***} & -0.76^{***} & -0.79^{***} & -1.15^{**} & -1.11^{**} \\
+                                                     & (0.20)      & (0.22)      & (0.23)      & (0.41)     & (0.40)     \\
+\quad Outdegree: Governmental actors                 & -0.12       & -0.08       & 0.05        & 0.07       & 0.42       \\
+                                                     & (0.17)      & (0.18)      & (0.20)      & (0.30)     & (0.29)     \\
+\quad Indegree: Governmental actors                  & 0.07        & 0.11        & 0.06        & -0.23      & -0.33      \\
+                                                     & (0.13)      & (0.14)      & (0.16)      & (0.26)     & (0.25)     \\
+\quad Outdegree: high reputation                     & 0.01        & 0.02^{*}    & 0.02^{*}    & 0.01       & 0.02       \\
+                                                     & (0.01)      & (0.01)      & (0.01)      & (0.02)     & (0.02)     \\
+\quad Difference in reputation                       & 0.03^{***}  & 0.02^{*}    & 0.01        & -0.00      & 0.00       \\
+                                                     & (0.01)      & (0.01)      & (0.01)      & (0.02)     & (0.01)     \\
+\quad Edges                                          & -4.83^{***} & -5.40^{***} & -5.09^{***} & -5.63^{**} & -5.54^{*}  \\
+                                                     & (0.82)      & (0.88)      & (0.89)      & (2.17)     & (2.23)     \\
+\midrule
+AIC                                                  & 1150.19     & 939.55      & 758.96      & 491.12     & 331.80     \\
+BIC                                                  & 1218.33     & 1004.96     & 821.29      & 549.91     & 386.44     \\
+Log Likelihood                                       & -563.09     & -457.77     & -367.48     & -233.56    & -153.90    \\
+\bottomrule
+\multicolumn{6}{l}{\tiny{$^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$}}
+\end{tabular}
+\end{footnotesize}
+\label{tab_ergmCH_missingObs}
+\end{center}
+\end{table}

@@ -1,0 +1,46 @@
+
+\begin{table}
+\caption{Results on network structure using exponential random graph models for each of the four policy networks}
+\begin{center}
+\begin{scriptsize}
+\begin{tabular}{l D{.}{.}{4.5} D{.}{.}{4.5} D{.}{.}{4.5} D{.}{.}{4.5}}
+\toprule
+ & \multicolumn{1}{c}{CH} & \multicolumn{1}{c}{DE} & \multicolumn{1}{c}{FR} & \multicolumn{1}{c}{NL} \\
+\midrule
+Hypotheses                                           &             &             &             &             \\
+                                                     &             &             &             &             \\
+\quad Power concentration (gwidegree, H1)            & -1.12^{***} & -1.12^{*}   & -2.32^{***} & -3.15^{***} \\
+                                                     & (0.34)      & (0.52)      & (0.70)      & (0.86)      \\
+\quad Collaboration with opponents (H2)              & 1.58^{***}  & 1.63^{***}  & 1.15        & 0.92^{*}    \\
+                                                     & (0.33)      & (0.30)      & (0.60)      & (0.45)      \\
+\quad Clustering (gwesp, H2)                         & 1.15^{***}  & 1.10^{***}  & 1.05^{*}    & 1.81        \\
+                                                     & (0.19)      & (0.27)      & (0.46)      & (1.04)      \\
+\quad Collaboration across belief dissimilarity (H2) & -0.05       & -0.64^{**}  & -0.79^{*}   & 0.16        \\
+                                                     & (0.15)      & (0.24)      & (0.32)      & (0.23)      \\
+Controls                                             &             &             &             &             \\
+                                                     &             &             &             &             \\
+\quad Reciprocity                                    & 1.20^{***}  & 1.24^{***}  & 1.13^{**}   & 1.51^{***}  \\
+                                                     & (0.26)      & (0.37)      & (0.42)      & (0.44)      \\
+\quad Instrument preference dissimilarity            & -0.89^{***} & -0.47       & -1.10^{**}  & 0.13        \\
+                                                     & (0.20)      & (0.33)      & (0.42)      & (0.51)      \\
+\quad Outdegree: Governmental actors                 & -0.12       & 0.12        & 0.37        & -0.60       \\
+                                                     & (0.16)      & (0.28)      & (0.40)      & (0.37)      \\
+\quad Indegree: Governmental actors                  & 0.07        & 0.33        & 0.63^{*}    & 0.37        \\
+                                                     & (0.13)      & (0.23)      & (0.29)      & (0.27)      \\
+\quad Outdegree: high reputation                     & 0.01        & 0.05^{**}   & 0.07^{*}    & 0.34^{***}  \\
+                                                     & (0.01)      & (0.02)      & (0.03)      & (0.07)      \\
+\quad Difference in reputation                       & 0.03^{***}  & -0.00       & 0.00        & 0.05        \\
+                                                     & (0.01)      & (0.02)      & (0.03)      & (0.04)      \\
+\quad Edges                                          & -3.18^{***} & -2.79^{***} & -1.39       & -6.23^{***} \\
+                                                     & (0.32)      & (0.52)      & (0.87)      & (1.61)      \\
+\midrule
+AIC                                                  & 1148.46     & 497.32      & 300.64      & 243.43      \\
+BIC                                                  & 1210.93     & 549.01      & 341.60      & 281.72      \\
+Log Likelihood                                       & -563.23     & -237.66     & -139.32     & -110.72     \\
+\bottomrule
+\multicolumn{5}{l}{\tiny{$^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$}}
+\end{tabular}
+\end{scriptsize}
+\label{tab_ergm}
+\end{center}
+\end{table}
