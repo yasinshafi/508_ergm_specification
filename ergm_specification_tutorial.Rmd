@@ -11,8 +11,8 @@ output:
 ```{r knitr-setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
                       cache = TRUE, fig.width = 9, fig.height = 6)
-## Set this to your ReplicationMaterials folder; all paths below are relative to it.
-knitr::opts_knit$set(root.dir = "dataverse_files/ReplicationMaterials")
+## Full path to the ReplicationMaterials folder; all paths below are relative to it.
+knitr::opts_knit$set(root.dir = "D:/Penn State/2026-2027/01 Fall 2026/PLSC 508/tutorial/dataverse_files/ReplicationMaterials")
 ```
 
 -   **Methods text:** Cranmer, Desmarais & Morgan, *Inferential Network Analysis*, Ch. 4 (pp. 67–97)
@@ -47,6 +47,8 @@ Each respondent received a complete list of the actors in its country and checke
 
 The same survey asked each actor to name **opponents** (actors it disagreed with on policy content) and to rate its **policy beliefs** and **instrument preferences** on 1–4 scales. These are not outcomes. They enter the model as covariates: the opponent matrix as `edgecov(O)`, and belief and instrument dissimilarity as `edgecov(B)` and `edgecov(I)`.
 
+### Hypotheses
+
 **H1 (Power).** Consensus systems diffuse power across several actors; majoritarian systems concentrate it in a few.
 
 -   Term: `gwidegree` (negative = in-degree concentrated = centralization)
@@ -66,11 +68,10 @@ The same survey asked each actor to name **opponents** (actors it disagreed with
 
 ## Setup
 
-Unzip the Dataverse archive and set the working directory to `ReplicationMaterials/`. The authors used network 1.16.1 and ergm 3.11.0. Under current versions, estimates differ slightly from the published tables (`SITAB4_ergms.tex`).
+Unzip the Dataverse archive and set `root.dir` in the setup chunk to the `ReplicationMaterials/` folder. The authors used network 1.16.1 and ergm 3.11.0. Under current versions, estimates differ slightly from the published tables (`SITAB4_ergms.tex`).
 
 ```{r chunk-01}
 library(network); library(sna); library(ergm); library(btergm)
-setwd("dataverse_files/ReplicationMaterials/")
 load("0_Data/data_prepared.RData")              # collabXX, oppXX, attXX, indegAll
 load("1_Analysis/output/attributeData.RData")   # attXX with imputed items appended
 set.seed(123)
@@ -272,6 +273,8 @@ fit1 <- ergm(g ~ edges + edgecov(O) +
 summary(fit1)
 ```
 
+> **In our run:** `gwidegree` −1.09 (H1: centralized), `gwesp` +1.15 (H2: close-knit), opponents +1.59 (H2: cooperation across divides survives controlling for structure), belief dissimilarity null. BIC 1213.
+
 > **Compare with 3a:** the authors' main model uses `gwidegree` instead of `istar(2)`. Its BIC is 1213 vs. 1198 for the in-2-star model, so the Markov term fits Switzerland better. The authors report the same in a footnote and run the in-2-star model as a robustness check because `gwidegree` fit the Swiss in-star distribution poorly. Note that the two terms carry opposite signs for the same pattern: `istar2` is positive, `gwidegree` is negative (see 4c).
 
 ```{r chunk-14}
@@ -291,29 +294,27 @@ par(mfrow = c(2, 3)); ergm:::plot.gof(gof_fit1); par(mfrow = c(1, 1))
 Benchmark against the authors' saved estimate (ergm 3.11.0):
 
 ```{r chunk-16}
-# setwd("dataverse_files/ReplicationMaterials/")
-load("dataverse_files/ReplicationMaterials/1_Analysis/output/ERGM_estimates/fit1CH.RData")
+load("1_Analysis/output/ERGM_estimates/fit1CH.RData")
 round(cbind(ours = coef(fit1), authors = coef(fit1CH)), 3)
 ```
 
-> Estimates are within about 0.03 of the authors'. Differences come from package versions and MCMC settings.
+> **In our run:** every estimate is within 0.03 of the authors' (largest gap: `gwidegree`, −1.094 vs. −1.124). Differences come from package versions and MCMC settings, not from the data or the model.
 
 ### 4b. Specification choices the authors fixed
 
 We change one at a time. This tests whether the H1 and H2 conclusions depend on these choices.
 
 ```{r chunk-17}
-fit1_dec  <- update(fit1, . ~ . - gwidegree(1.4, fixed = TRUE) +
-                      gwidegree(0.5, fixed = TRUE))                # decay
-fit1_dsp  <- tryCatch(update(fit1, . ~ . + dgwdsp(0.25, fixed = TRUE, type = "OTP")),
-                      error = function(e) { message("dgwdsp model: ", conditionMessage(e)); NULL })
-# fit1_outd <- update(fit1, . ~ . + gwodegree(1.4, fixed = TRUE))   # activity spread
-# mods <- list(main = fit1, decay0.5 = fit1_dec, plus_gwdsp = fit1_dsp,
-#              plus_gwodeg = fit1_outd)
-# sapply(Filter(Negate(is.null), mods), BIC)
+fit1_dec <- update(fit1, . ~ . - gwidegree(1.4, fixed = TRUE) +
+                     gwidegree(0.5, fixed = TRUE))                # decay
+fit1_dsp <- tryCatch(update(fit1, . ~ . + dgwdsp(0.25, fixed = TRUE, type = "OTP")),
+                     error = function(e) NULL)                     # 2-path control
+is.null(fit1_dsp)                                                 # TRUE = the dgwdsp model failed
+sapply(Filter(Negate(is.null),
+              list(main = fit1, decay0.5 = fit1_dec, plus_gwdsp = fit1_dsp)), BIC)
 ```
 
-> **In our run:** adding the 2-path control (`dgwdsp`) made the sampler stop mixing, which is degeneracy from one extra term. The paper's footnote reports the same fragility: changing the in-degree decay made the DE, FR, and NL models degenerate.
+> **In our run:** adding the 2-path control (dgwdsp) made the sampler stop mixing, which is degeneracy from one extra term. Changing the gwidegree decay from 1.4 to 0.5 raises BIC from 1213 to 1220, so the authors' choice of 1.4 fits better, matching their BIC-based selection. Their footnote reports the same fragility: changing the in-degree decay made the DE, FR, and NL models degenerate.
 
 ### 4c. What does the `gwidegree` sign mean?
 
@@ -329,6 +330,8 @@ for (b in c(-abs(coef(fit1)[k]), abs(coef(fit1)[k]))) {
       "| mean in-degree centralization:", round(mean(cent), 3), "\n")
 }
 ```
+
+> **In our run:** the negative value gives higher in-degree centralization (0.48 vs. 0.41), even though the positive value produces twice as many edges (465 vs. 229). Negative means concentration, which confirms the authors' reading (citing Levy 2016). Contrast with `istar2` in 3a, where positive means centralization.
 
 ------------------------------------------------------------------------
 
@@ -355,12 +358,34 @@ fit_country <- function(cc, seed = 123) {
 fits <- lapply(names(nw), function(cc)
   tryCatch(fit_country(cc),
            error = function(e) tryCatch(fit_country(cc, seed = 1234),
-                                        error = function(e2) { message(cc, ": using authors' saved fit")
-                                          load(sprintf("dataverse_files/ReplicationMaterials/1_Analysis/output/ERGM_estimates/fit1%s.RData", cc))
+                                        error = function(e2) {
+                                          load(sprintf("1_Analysis/output/ERGM_estimates/fit1%s.RData", cc))
                                           get(paste0("fit1", cc)) })))
 names(fits) <- names(nw)
-texreg::screenreg(fits)
+
+## The authors' saved fit uses different coefficient names; map them onto one row each.
+cm <- list("edges" = "Edges",
+           "edgecov.O" = "Opponents", "edgecov.oppNL" = "Opponents",
+           "gwesp.OTP.fixed.0.25" = "GWESP", "gwesp.fixed.0.25" = "GWESP",
+           "gwideg.fixed.1.4" = "GWI-degree",
+           "edgecov.B" = "Belief dissim.", "edgecov.beliefsimNL_noNA" = "Belief dissim.",
+           "edgecov.I" = "Instrument dissim.", "edgecov.instrumentprefNL_noNA" = "Instrument dissim.",
+           "mutual" = "Reciprocity",
+           "nodeofactor.actorType.national" = "Out: national gov.",
+           "nodeifactor.actorType.national" = "In: national gov.",
+           "nodeocov.repuTarget" = "Out: reputation",
+           "absdiff.repuTarget" = "Reputation difference")
+texreg::screenreg(fits, custom.coef.map = cm)
 ```
+
+> **In our run:** the Dutch model failed with both seeds, so the NL column uses the authors' saved fit (ergm 3.11.0). With 16 actors and 11 parameters, the curved terms could not be estimated under current ergm, which is itself a lesson in fragility.
+
+> NL: GWESP is positive but not significant (1.81, SE 1.04), and opponent ties are weakly positive (0.92, p < 0.05). This matches the paper: no closure in the Netherlands and only weak collaboration with opponents.
+
+>
+> **H1:** `gwidegree` is −1.12 in CH and DE, −2.33 in FR, and −3.15 in NL. Centralization is strongest in the unitary systems, consistent with H1. Coefficients are not strictly comparable across networks, but the pattern matches the paper's predicted-probability results.
+>
+> **Belief dissimilarity:** negative in DE (−0.63) and FR (−0.77). The paper reports an effect only for FR because its main results come from the model with the opponent × belief interaction; this table uses the model without it (SI Table 4).
 
 ### Predicted probability of a tie to an opponent vs. a non-opponent (H2 quality)
 
@@ -371,4 +396,6 @@ probs <- Filter(Negate(is.null), probs)
 sapply(probs, function(d) tapply(d$probability, d[, grep("edgecov.O", names(d))], mean))
 ```
 
-> Rows: 0 = non-opponent, 1 = opponent. H2 expects a larger gap in CH and DE than in FR, where few opponents are named at all.
+> Rows: 0 = non-opponent, 1 = opponent. `edgeprob()` cannot read the authors' older NL object, so only CH, DE, and FR appear.
+>
+> **In our run:** naming someone as an opponent raises the tie probability from 0.11 to 0.41 in CH, 0.11 to 0.50 in DE, and 0.26 to 0.59 in FR. In relative terms the jump is larger in the consensus systems (×3.6 in CH, ×4.4 in DE vs. ×2.3 in FR), and the opponent coefficient is significant in CH and DE but not FR, consistent with H2.
