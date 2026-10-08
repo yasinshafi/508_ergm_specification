@@ -11,13 +11,17 @@ output:
 ```{r knitr-setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
                       cache = TRUE, fig.width = 9, fig.height = 6)
-## Full path to the ReplicationMaterials folder; all paths below are relative to it.
-knitr::opts_knit$set(root.dir = "D:/Penn State/2026-2027/01 Fall 2026/PLSC 508/tutorial/dataverse_files/ReplicationMaterials")
 ```
 
 -   **Methods text:** Cranmer, Desmarais & Morgan, *Inferential Network Analysis*, Ch. 4 (pp. 67–97)
 -   **Replication data:** Metz & Brandenberger (2023), "Policy Networks Across Political Systems," *AJPS* 67(3). Harvard Dataverse [doi:10.7910/DVN/NKCDCO](https://doi.org/10.7910/DVN/NKCDCO)
 -   **Networks:** directed collaboration ties among water-policy actors (micropollutants) in Switzerland (CH, n = 47), Germany (DE, 29), France (FR, 18), and the Netherlands (NL, 16)
+
+Each code chunk is labeled as one of:
+
+-   **Replication**: reproduces something the paper or its replication script does.
+-   **Partial replication**: the paper does something similar, but we change the model, the measure, or the presentation.
+-   **Extension**: not in the paper; added for this tutorial.
 
 ------------------------------------------------------------------------
 
@@ -62,24 +66,52 @@ The same survey asked each actor to name **opponents** (actors it disagreed with
 | Quality 1 | `edgecov(opponents)`            | \+ in consensus systems   |
 | Quality 2 | `edgecov(belief dissimilarity)` | −, strongest in FR        |
 
+### Background: consensus vs. majoritarian democracy
+
+Lijphart distinguishes two visions of democracy by how they answer one question: *who governs when people disagree?*
+
+-   **Majoritarian democracy** concentrates power in the hands of the majority. A single party typically controls the cabinet, elections are first-past-the-post, the state is unitary, and interest groups compete with one another (pluralism). The winner governs and the loser waits for the next election. In policy networks, this predicts **concentrated power** and **limited contact with opponents**: decisions run through a few central actors, and competitors are kept out rather than bargained with.
+-   **Consensus democracy** spreads power across many actors. It has multi-party coalition cabinets, proportional representation, federalism, and corporatist arrangements that bring interest groups into policymaking. No single actor can decide alone, so agreement must be built. In policy networks, this predicts **diffused power** and **dense, cooperative ties that cross divides**, because institutions such as consultation procedures and working groups bring opponents into regular contact.
+
+In this paper, Switzerland and Germany are consensual–federal, France is majoritarian–unitary, and the Netherlands is a consensual–unitary hybrid.
+
+### Background: Advocacy Coalition Framework
+
+Which beliefs bind a coalition?
+
+| Belief layer | Content | Example in this paper | Shared within a coalition? | Expected effect of dissimilarity on collaboration |
+|---|---|---|---|---|
+| **Deep core** | Fundamental values across all policy areas (left/right, role of the state) | Not measured | Not required | Weak or none |
+| **Policy core** | Positions within one policy area: seriousness and causes of the problem, priority of values, basic strategy | Belief items: act at the source vs. end-of-pipe, precaution, wait for evidence, eliminate the substance | **Yes. Defines the coalition** | **Negative** (`edgecov(B)`) |
+| **Secondary aspects** (instrumental beliefs) | Specific means: which tool, regulation, or budget | Instrument items: bans on single substances, discharge requirements | Not required; negotiable | Weaker (`edgecov(I)`) |
+
+> **Note:** ACF predicts *coalitions*, but the paper's outcome is *collaboration*, which also includes bargaining with opponents. Keep the ACF expectation in mind when reading the belief and instrument coefficients in Sections 2, 4a, and 5.
+
 **Findings.** All four networks are centralized, more steeply in FR and NL (H1 supported). There is closure in CH, DE, and FR but not NL. Opponent ties are positive in CH and DE (weakly in NL) and null in FR. Belief dissimilarity matters only in FR. France is dense because opponents are excluded, not because of consensus-seeking.
 
 ------------------------------------------------------------------------
 
 ## Setup
 
-Unzip the Dataverse archive and set `root.dir` in the setup chunk to the `ReplicationMaterials/` folder. The authors used network 1.16.1 and ergm 3.11.0. Under current versions, estimates differ slightly from the published tables (`SITAB4_ergms.tex`).
+**Folder layout.** Download the Dataverse archive, unzip it, and place this `.Rmd` in the folder that contains `dataverse_files/`. Do not rename the folders. All paths below are relative to the `.Rmd`, so the tutorial runs on any machine with this layout, whether you knit or run chunks one at a time (in RStudio, set *Knit → Knit Directory → Document Directory*).
+
+**Seeds.** Every step that draws random numbers (MCMC estimation, simulation, goodness of fit, network layouts) uses seed 123, so results are identical across runs and machines. If you change a chunk, delete the `_cache` folder before re-knitting.
+
+**Versions.** The authors used network 1.16.1 and ergm 3.11.0. Under current versions, estimates differ slightly from the published tables (`SITAB4_ergms.tex`). `sessionInfo()` at the end records the versions used here.
+
+**Replication.** We load the authors' prepared data and their imputed attribute file, exactly as their script does.
 
 ```{r chunk-01}
 library(network); library(sna); library(ergm); library(btergm)
-load("0_Data/data_prepared.RData")              # collabXX, oppXX, attXX, indegAll
-load("1_Analysis/output/attributeData.RData")   # attXX with imputed items appended
+base <- "dataverse_files/ReplicationMaterials"                 # relative to this .Rmd
+load(file.path(base, "0_Data/data_prepared.RData"))            # collabXX, oppXX, attXX, indegAll
+load(file.path(base, "1_Analysis/output/attributeData.RData")) # attXX with imputed items appended
 set.seed(123)
 ```
 
 ### Build networks and dyadic covariates
 
-Newer versions of `network` read a data frame as an edgelist, so convert to a matrix first. Belief and instrument dissimilarity are the mean absolute difference over survey items, the same as the authors' loops. Items are on 1–4 agreement scales, so values run from 0 to 3.
+**Replication, adapted to current packages.** Newer versions of `network` read a data frame as an edgelist, so we convert to a matrix first. Belief and instrument dissimilarity are the mean absolute difference over survey items, giving the same values as the authors' loops. Items are on 1–4 agreement scales, so values run from 0 to 3.
 
 ```{r chunk-02}
 make_nw <- function(collab, att) {
@@ -104,7 +136,7 @@ nw  <- list(CH = make_nw(collabCH, attCH), DE = make_nw(collabDE, attDE),
 opp <- lapply(list(CH = oppCH, DE = oppDE, FR = oppFR, NL = oppNL), as.matrix)
 ```
 
-Columns 19:23 (beliefs) and 24:32 (instruments) are the **imputed** items appended in `attributeData.RData`. The raw items are in columns 4:8 and 9:17.
+**Replication.** Columns 19:23 (beliefs) and 24:32 (instruments) are the **imputed** items appended in `attributeData.RData`, the same columns the authors use. The raw items are in columns 4:8 and 9:17.
 
 ```{r chunk-03}
 belief <- list(CH = dissim(attCH, 19:23), DE = dissim(attDE, 19:23),
@@ -115,13 +147,15 @@ instr  <- list(CH = dissim(attCH, 24:32), DE = dissim(attDE, 24:32),
 
 ### Checks
 
+**Extension.** Sanity checks that the networks and covariates were built correctly.
+
 ```{r chunk-04}
 sapply(belief, function(m) sum(is.na(m)))     # edgecov needs no NAs
 sapply(nw, network.size)                      # 47, 29, 18, 16
 sapply(nw, network.edgecount)                 # 241, 116, 93, 108
 ```
 
-The paper reports 253, 121, 96, and 108 edges. These equal our counts plus self-nominations on the diagonal (12, 5, 3, 0), which are not valid dyads and are dropped:
+**Extension.** The paper reports 253, 121, 96, and 108 edges. These equal our counts plus self-nominations on the diagonal (12, 5, 3, 0), which are not valid dyads and are dropped:
 
 ```{r chunk-05}
 sapply(list(CH = collabCH, DE = collabDE, FR = collabFR, NL = collabNL), function(m) {
@@ -131,7 +165,7 @@ sapply(list(CH = collabCH, DE = collabDE, FR = collabFR, NL = collabNL), functio
 lapply(nw, function(g) sort(unique(g %v% "actorType")))
 ```
 
-"National" means national government (ministry, parliament, bureaucracy). Regional and local government form a separate category, so the authors' "governmental actors" term covers national government only.
+**Replication.** The authors' `base = -3` (ergm 3.11) keeps only the `"national"` level, which we now select by name. "National" means national government (ministry, parliament, bureaucracy). Regional and local government form a separate category, so the authors' "governmental actors" term covers national government only.
 
 ```{r chunk-06}
 gov <- c(CH = "national", DE = "national", FR = "national", NL = "national")
@@ -139,6 +173,127 @@ gov <- c(CH = "national", DE = "national", FR = "national", NL = "national")
 ## We work with Switzerland; Section 5 brings in the other three.
 g <- nw$CH; O <- opp$CH; B <- belief$CH; I <- instr$CH; lv <- gov["CH"]
 ```
+
+------------------------------------------------------------------------
+
+## 0. Descriptive overview
+
+Before modeling, we look at what the four networks contain. Each item below sets up a later modeling choice.
+
+### Network-level summary
+
+**Partial replication.** The paper reports actors, edges, and density for each network. We add reciprocity, transitivity, centralization, and isolates.
+
+-   **Density:** share of possible directed ties present, edges / (n(n − 1)).
+-   **Reciprocity:** share of ties that are returned.
+-   **Transitivity:** share of two-paths i → j → k that are closed by i → k.
+-   **In-/out-degree centralization:** how unequally incoming/outgoing ties are spread (0 = all actors equal, 1 = one actor holds all ties).
+
+```{r desc-01}
+desc <- t(sapply(nw, function(x) c(
+  actors         = network.size(x),
+  edges          = network.edgecount(x),
+  density        = round(sna::gden(x), 3),
+  reciprocity    = unname(round(sna::grecip(x, measure = "edgewise"), 3)),
+  transitivity   = round(sna::gtrans(x), 3),
+  indeg_central  = round(sna::centralization(x, sna::degree, cmode = "indegree"), 3),
+  outdeg_central = round(sna::centralization(x, sna::degree, cmode = "outdegree"), 3),
+  isolates       = length(sna::isolates(x)),
+  mean_outdegree = round(mean(sna::degree(x, cmode = "outdegree")), 2))))
+desc
+```
+
+> **What we see:** density rises from 11% (CH) to 45% (NL) because smaller networks are denser; reciprocity and transitivity rise with it. This is why Section 5 compares predicted probabilities rather than raw coefficients. Note that raw in-degree centralization is *highest* in Switzerland (0.73), the opposite of H1. The index depends on network size and density, so it cannot be compared across these networks. The ERGM's `gwidegree` asks a different question: whether in-ties concentrate *more than expected given density, reciprocity, and closure*. That is where the H1 pattern appears (Section 5).
+
+### Who is in each network?
+
+**Extension.** Actor-type composition by country.
+
+```{r desc-02}
+types <- sort(unique(unlist(lapply(nw, function(x) x %v% "actorType"))))
+sapply(nw, function(x) table(factor(x %v% "actorType", levels = types)))
+```
+
+### In-degree distributions
+
+**Extension.** A skewed in-degree distribution (a few actors receive most nominations) is the pattern `gwidegree` models for H1.
+
+```{r desc-03, fig.height = 3.5}
+par(mfrow = c(1, 4))
+for (cc in names(nw)) {
+  hist(sna::degree(nw[[cc]], cmode = "indegree"), breaks = 10,
+       main = cc, xlab = "In-degree", col = "grey80", border = "white")
+}
+par(mfrow = c(1, 1))
+```
+
+### The four networks
+
+**Partial replication** of the paper's Figure 1. Nodes are colored by actor type and sized by in-degree. Layouts are random, so we set the seed.
+
+```{r desc-04, fig.height = 8.5}
+set.seed(123)
+pal <- setNames(c("#E69F00", "#56B4E9", "#009E73", "#F0E442",
+                  "#0072B2", "#D55E00", "#CC79A7")[seq_along(types)], types)
+
+par(mfrow = c(2, 2), mar = c(1, 1, 2, 1), oma = c(4, 0, 0, 0))   # room at the bottom
+for (cc in names(nw)) {
+  x <- nw[[cc]]
+  plot(x, vertex.col = pal[x %v% "actorType"],
+       vertex.cex = 0.5 + sna::degree(x, cmode = "indegree") / 8,
+       arrowhead.cex = 0.4, edge.col = "grey60", main = cc)
+}
+
+## One shared legend across the bottom of the figure
+par(fig = c(0, 1, 0, 1), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), new = TRUE)
+plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n")
+legend("bottom", legend = types, col = pal, pch = 19, pt.cex = 1.5,
+       ncol = 4, bty = "n", xpd = TRUE, title = "Actor type (node size = in-degree)")
+par(mfrow = c(1, 1))
+```
+
+### The opponent network
+
+**Extension.** How many opponents are named, and how often an opponent is also a collaboration partner. This is the raw pattern behind `edgecov(O)`.
+
+```{r desc-05}
+t(sapply(names(nw), function(cc) {
+  m <- as.matrix(nw[[cc]]); o <- opp[[cc]]; diag(o) <- 0
+  c(opponent_ties        = sum(o == 1),
+    also_collaboration   = sum(o == 1 & m == 1),
+    share_collab_if_opp  = round(mean(m[o == 1]), 3),
+    share_collab_if_not  = round(mean(m[o == 0 & row(m) != col(m)]), 3))
+}))
+```
+
+> **What we see:** in every country, actors collaborate more with those they name as opponents than with others. The jump is about ×4 in CH (0.39 vs. 0.10) and DE (0.47 vs. 0.11) but only about ×2 in FR and NL, where the dense small networks raise the baseline. France names only 14 opponents, so `edgecov(O)` has little variation there.
+
+### Belief dissimilarity among tied and untied pairs
+
+**Partial replication** of the paper's Figure 6 (left panel), which shows tied pairs only. We add untied pairs for comparison.
+
+```{r desc-06, fig.height = 4.5}
+bd <- do.call(rbind, lapply(names(nw), function(cc) {
+  m <- as.matrix(nw[[cc]]); off <- row(m) != col(m)
+  data.frame(country = cc, tie = ifelse(m[off] == 1, "tie", "no tie"),
+             dissim = belief[[cc]][off])
+}))
+boxplot(dissim ~ tie + country, data = bd, las = 2, xlab = "",
+        ylab = "Belief dissimilarity (0–3)", col = c("grey85", "grey55"))
+aggregate(dissim ~ country + tie, data = bd, FUN = function(v) round(mean(v), 2))
+```
+
+> **What we see:** tied pairs are slightly more similar in beliefs than untied pairs in CH (0.79 vs. 0.89) and FR (0.70 vs. 0.75), with almost no difference in DE (0.91 vs. 0.93), and the reverse in NL (0.95 vs. 0.82). France's collaborators are the most belief-similar (0.70), as in the paper's Figure 6. The raw gaps are small, so any belief effect has to emerge once structure is controlled.
+
+### Reputation and in-degree
+
+**Extension.** Reputation counts how often others named an actor "particularly important." If it tracks collaboration in-degree closely, using it as a *receiver* effect (Section 2) is close to circular.
+
+```{r desc-07}
+sapply(nw, function(x) round(cor(x %v% "repuTarget", sna::degree(x, cmode = "indegree")), 2))
+```
+
+> **What we see:** correlations of 0.82–0.92. Reputation and collaboration in-degree are nearly the same measure, which is why `nodeicov(reputation)` in Section 2 fits "better for the wrong reason."
 
 ------------------------------------------------------------------------
 
@@ -150,8 +305,24 @@ g <- nw$CH; O <- opp$CH; B <- belief$CH; I <- instr$CH; lv <- gov["CH"]
 -   H2 close-knit interaction → transitive triples / `gwesp` (closure)
 -   H2 cooperative interaction → covariates (Section 2), not structure
 
+**Extension.** The paper does not report configuration counts. `summary()` counts each configuration in the observed network; these counts are the statistics an ERGM can condition on:
+
+-   `edges`: number of ties.
+-   `mutual`: pairs tied in both directions (i → j and j → i).
+-   `istar(2)` / `ostar(2)`: pairs of ties received by (sent from) the same actor. Many in-2-stars mean some actors receive a lot of ties.
+-   `ttriple`: transitive triples, i → j, j → k, and i → k ("a partner's partner is my partner," with a direction of flow).
+-   `ctriple`: cyclic triples, i → j → k → i. Few cycles relative to transitive triples suggest a hierarchy.
+-   `gwidegree(1.4, fixed = TRUE)`: a geometrically weighted summary of the in-degree distribution. The decay (1.4) sets how quickly each additional incoming tie to the same actor stops counting; `fixed = TRUE` keeps it at 1.4 instead of estimating it.
+-   `gwesp(0.25, fixed = TRUE)`: geometrically weighted edgewise shared partners. For each tie i → j it counts the partners k with i → k → j (in a directed network, ergm's default is this "outgoing two-path," OTP). The first shared partner counts fully and each further one less, at a rate set by the decay (0.25).
+
 ```{r chunk-07}
-plot(g, vertex.col = as.factor(g %v% "actorType"), arrowhead.cex = 0.5)
+set.seed(123)   # network layout is random
+ch_types <- sort(unique(g %v% "actorType"))
+plot(g, vertex.col = pal[g %v% "actorType"],
+     vertex.cex = 0.5 + sna::degree(g, cmode = "indegree") / 8,
+     arrowhead.cex = 0.5, edge.col = "grey60", main = "Switzerland")
+legend("topleft", legend = ch_types, col = pal[ch_types], pch = 19, pt.cex = 1.3,
+       bty = "n", cex = 0.8, title = "Actor type (size = in-degree)")
 summary(g ~ edges + mutual + istar(2) + ostar(2) + ttriple + ctriple +
           gwidegree(1.4, fixed = TRUE) + gwesp(0.25, fixed = TRUE))
 ```
@@ -159,6 +330,8 @@ summary(g ~ edges + mutual + istar(2) + ostar(2) + ttriple + ctriple +
 > **In our run:** 241 edges, 52 mutual pairs, 619 transitive vs. 161 cyclic triples. Closure is hierarchical (transitive), not cyclic.
 
 ### Boundary specification: who is in the network?
+
+**Extension.** The paper reports response rates; here we make the consequence for the network boundary explicit.
 
 ```{r chunk-08}
 table(indegAll$country, indegAll$missing)     # 1 = survey non-responder
@@ -176,6 +349,16 @@ Non-responders are dropped from the networks (CH 5, DE 10, FR 14, NL 10), not ke
 -   `edgecov(B)`: does belief dissimilarity reduce collaboration? H2 expects negative, but weaker in consensus systems.
 -   The other terms are controls: instrument preferences, national government, and reputation.
 
+**Extension.** The paper does not report a covariate-only model. Every term here is **dyad-independent**: whether i → j forms does not depend on any other tie. The model is therefore an ordinary logistic regression on the 2,162 directed pairs, and ergm fits it without MCMC. Each coefficient is the change in the log-odds of a tie when its statistic rises by one, holding the other terms fixed.
+
+-   `edges`: the baseline log-odds of a tie, like a regression intercept.
+-   `edgecov(O)`: sums a dyadic covariate over tied pairs. O is 1 if i named j as an opponent, so the coefficient is the shift in log-odds for a tie to a named opponent.
+-   `edgecov(B)`, `edgecov(I)`: the same for belief and instrument dissimilarity (0–3). The coefficient is the shift in log-odds per scale point of average disagreement.
+-   `nodeofactor("actorType", levels = lv)`: counts out-ties sent by actors in the chosen category (national government). Positive = that category is more active (sociality).
+-   `nodeifactor("actorType", levels = lv)`: counts in-ties received by that category. Positive = more popular.
+-   `nodeocov("repuTarget")`: sums the sender's reputation over all ties. Positive = high-reputation actors send more ties.
+-   `absdiff("repuTarget")`: sums \|reputation_i − reputation_j\| over ties. Negative = homophily (similar actors tie); positive = ties link actors of different reputation.
+
 ```{r chunk-09}
 m_exo <- ergm(g ~ edges +
                 edgecov(O) +                        # i collaborates with j whom i names as opponent
@@ -191,6 +374,8 @@ summary(m_exo)    # dyad-independent: logistic regression, no MCMC
 > **In our run:** opponents +1.70 (H2 supported for CH), belief dissimilarity null, instrument dissimilarity −1.51.
 
 ### Swap the reputation term: sociality vs. popularity
+
+**Extension.** `nodeicov("repuTarget")` is the receiver-side version of `nodeocov`: it sums the *receiver's* reputation over all ties. Positive = high-reputation actors receive more ties. The two terms ask different questions (activity vs. popularity), which is the distinction in Table 4.1 of Ch. 4.
 
 ```{r chunk-10}
 m_exo_i <- update(m_exo, . ~ . - nodeocov("repuTarget") + nodeicov("repuTarget"))
@@ -216,6 +401,11 @@ summary(m_exo_i)
 
 ### 3a. `istar(2)` in place of `gwidegree`
 
+**Replication** of the authors' Swiss robustness model (SI Table 5; `fit1CHb` in their script). This model adds two **dyad-dependent** terms, so whether one tie forms now depends on others, and ergm estimates by MCMC:
+
+-   `istar(2)` replaces `gwidegree`. It counts pairs of ties received by the same actor. Adding a tie to an actor who already has d in-ties raises the count by d, so a positive coefficient means ties flow to already-popular actors. Each extra in-tie counts at full weight, which is what makes Markov stars prone to degeneracy.
+-   `gwesp` and `mutual` (introduced in Section 1) enter as controls for closure and reciprocity.
+
 ```{r chunk-11}
 m_markov <- ergm(g ~ edges + edgecov(O) + gwesp(0.25, fixed = TRUE) + istar(2) +
                    edgecov(B) + edgecov(I) + mutual +
@@ -230,7 +420,7 @@ summary(m_markov)
 
 ### 3b. Degeneracy on this network
 
-Fit an all-Markov model by MPLE, then push the transitive-triple parameter up and simulate.
+**Extension.** This model contains only Markov terms: edges, `mutual`, `istar(2)`, `ostar(2)`, and `ttriple`. Each additional configuration counts at full weight with no down-weighting. Fitting it by MPLE (maximum pseudo-likelihood) treats each tie as a logistic regression given the rest of the network. It runs fast, but its estimates can describe a model that does not reproduce the network it was fitted to. We then push the transitive-triple parameter up and simulate.
 
 ```{r chunk-12}
 m_mple <- ergm(g ~ edges + mutual + istar(2) + ostar(2) + ttriple,
@@ -238,14 +428,14 @@ m_mple <- ergm(g ~ edges + mutual + istar(2) + ostar(2) + ttriple,
 theta <- coef(m_mple)
 for (bump in c(0, 0.25, 0.5, 1)) {
   th <- theta; th["ttriple"] <- th["ttriple"] + bump
-  s <- simulate(m_mple, coef = th, nsim = 50, output = "stats",
+  s <- simulate(m_mple, coef = th, nsim = 50, output = "stats", seed = 123,
                 control = control.simulate.ergm(MCMC.burnin = 20000))
   cat("ttriple +", bump, ": mean edges =", round(mean(s[, "edges"])),
       " (observed", network.edgecount(g), ")\n")
 }
 ```
 
-> **In our run:** at the estimates themselves, simulated networks average 25 edges (observed 241). One +0.25 step gives the complete graph (2,162 edges). The Markov model cannot reproduce the observed network at all. Curved terms (Section 4) damp this.
+> **In our run:** even at the MPLE estimates themselves, simulated networks average 2,160 of 2,162 possible edges (observed 241), and pushing `ttriple` up only fills the remaining dyads. The Markov model cannot reproduce the network it was fitted to: its probability mass sits on the complete graph. This is degeneracy. Curved terms (Section 4) damp it.
 
 ------------------------------------------------------------------------
 
@@ -261,6 +451,14 @@ for (bump in c(0, 0.25, 0.5, 1)) {
 
 ### 4a. Replicate the authors' main model without interaction (SI Table 4)
 
+**Replication** of the authors' main Swiss model without interaction (SI Table 4; `fit1CH` in their script). We add a longer MCMC interval to reduce autocorrelation. The two curved terms replace their Markov counterparts:
+
+-   `gwidegree(1.4, fixed = TRUE)`: the curved version of in-stars. Each additional in-tie to the same actor adds less than the previous one, so the statistic cannot explode the way `istar(2)` can. **Sign:** negative = in-degree concentrated on a few actors (centralization, H1); positive = ties spread evenly. This is the opposite of `istar(2)` (see 4c).
+-   `gwesp(0.25, fixed = TRUE)`: the curved version of transitive triples. Positive = a tie is more likely when i and j already share partners (closure, H2 quantity). With a small decay such as 0.25, the first shared partner carries almost all the weight.
+-   `mutual`: number of reciprocated pairs. Positive = collaboration nominations tend to be returned.
+
+The covariate terms keep their meaning from Section 2, but they are now estimated *net of* reciprocity, closure, and the in-degree distribution.
+
 ```{r chunk-13}
 fit1 <- ergm(g ~ edges + edgecov(O) +
                gwesp(0.25, fixed = TRUE) +            # H2 quantity: clustering
@@ -273,28 +471,32 @@ fit1 <- ergm(g ~ edges + edgecov(O) +
 summary(fit1)
 ```
 
-> **In our run:** `gwidegree` −1.09 (H1: centralized), `gwesp` +1.15 (H2: close-knit), opponents +1.59 (H2: cooperation across divides survives controlling for structure), belief dissimilarity null. BIC 1213.
+> **In our run:** `gwidegree` −1.09 (H1: centralized), `gwesp` +1.15 (H2: close-knit), opponents +1.59 (H2: cooperation across divides survives controlling for structure), belief dissimilarity null. BIC 1213. Instrument dissimilarity is strongly negative (−0.88) while belief dissimilarity is null: the reverse of the ACF expectation. Swiss actors collaborate across policy core divides, around shared solutions, which fits the paper's consensus-democracy argument.
 
 > **Compare with 3a:** the authors' main model uses `gwidegree` instead of `istar(2)`. Its BIC is 1213 vs. 1198 for the in-2-star model, so the Markov term fits Switzerland better. The authors report the same in a footnote and run the in-2-star model as a robustness check because `gwidegree` fit the Swiss in-star distribution poorly. Note that the two terms carry opposite signs for the same pattern: `istar2` is positive, `gwidegree` is negative (see 4c).
+
+**Extension.** The authors' script includes `mcmc.diagnostics()` but does not report it.
 
 ```{r chunk-14}
 mcmc.diagnostics(fit1)
 ```
 
-> **In our run:** autocorrelation at the first lag fell from about 0.80 to 0.64 with the longer interval. Geweke tests pass (joint p = 0.43).
+> **In our run:** autocorrelation at the first lag is about 0.64 with the longer MCMC interval (about 0.80 with ergm's default), and Geweke tests pass (joint p = 0.43).
 
-`btergm` overrides `plot()` for GOF objects, so we call ergm's method directly. The authors used `btergm::gof(..., rocpr)` instead.
+**Partial replication.** The paper reports goodness of fit (Figure 2) using `btergm::gof(..., rocpr)` on the interaction model. We use ergm's GOF on the model without interaction. `btergm` overrides `plot()` for GOF objects, so we call ergm's method directly. GOF simulates networks, so we set the seed.
 
 ```{r chunk-15}
-gof_fit1 <- ergm::gof(fit1)
-gof_fit1                                   # text summary with MC p-values
+gof_fit1 <- ergm::gof(fit1, control = control.gof.ergm(seed = 123))
+round(gof_fit1$summary.model, 2)          # model statistics: observed vs. simulated
 par(mfrow = c(2, 3)); ergm:::plot.gof(gof_fit1); par(mfrow = c(1, 1))
 ```
 
-Benchmark against the authors' saved estimate (ergm 3.11.0):
+> **In our run:** every model statistic is reproduced well by the simulated networks (all MC p-values ≥ 0.56). Check the plots for the auxiliary statistics, especially in-degree, which the authors flag as the weak spot of this specification.
+
+**Extension.** Benchmark against the authors' saved estimate (ergm 3.11.0):
 
 ```{r chunk-16}
-load("1_Analysis/output/ERGM_estimates/fit1CH.RData")
+load(file.path(base, "1_Analysis/output/ERGM_estimates/fit1CH.RData"))
 round(cbind(ours = coef(fit1), authors = coef(fit1CH)), 3)
 ```
 
@@ -302,7 +504,10 @@ round(cbind(ours = coef(fit1), authors = coef(fit1CH)), 3)
 
 ### 4b. Specification choices the authors fixed
 
-We change one at a time. This tests whether the H1 and H2 conclusions depend on these choices.
+We change one at a time. This tests whether the H1 and H2 conclusions depend on these choices. Both refits reuse `fit1`'s control settings, including seed 123.
+
+-   **Decay 0.5 instead of 1.4 (partial replication):** the paper says it compared decay values by BIC but does not report them. A lower decay discounts additional in-ties faster, so the term responds to whether actors have *any* in-ties more than to how many.
+-   **`dgwdsp(0.25, fixed = TRUE, type = "OTP")` (extension):** geometrically weighted *dyadwise* shared partners. It counts shared partners for all pairs, tied or not. Including it with `gwesp` separates closure (shared partners on actual ties) from simply having many two-paths.
 
 ```{r chunk-17}
 fit1_dec <- update(fit1, . ~ . - gwidegree(1.4, fixed = TRUE) +
@@ -314,24 +519,44 @@ sapply(Filter(Negate(is.null),
               list(main = fit1, decay0.5 = fit1_dec, plus_gwdsp = fit1_dsp)), BIC)
 ```
 
-> **In our run:** adding the 2-path control (dgwdsp) made the sampler stop mixing, which is degeneracy from one extra term. Changing the gwidegree decay from 1.4 to 0.5 raises BIC from 1213 to 1220, so the authors' choice of 1.4 fits better, matching their BIC-based selection. Their footnote reports the same fragility: changing the in-degree decay made the DE, FR, and NL models degenerate.
+> **In our run:** adding the 2-path control (`dgwdsp`) made the sampler stop mixing, which is degeneracy from one extra term. Changing the `gwidegree` decay from 1.4 to 0.5 raises BIC from 1213 to 1220, so the authors' choice of 1.4 fits better, matching their BIC-based selection. Their footnote reports the same fragility: changing the in-degree decay made the DE, FR, and NL models degenerate.
+
+### Try it yourself
+
+**Extension.** Two changes to `fit1`, one choice at a time. Because both are fitted to the same network, their BICs are directly comparable with `fit1`'s.
+
+-   **(a)** `edgecov(t(O))` uses opposition reported by the *receiver* (j named i as an opponent) instead of the sender. Does cooperation with opponents hold when we use the other side's perception?
+-   **(b)** A larger `gwesp` decay (0.75 instead of 0.25) gives more weight to second and third shared partners, pushing the term back toward a Markov triangle count. **Expect this to fail** with "MCMC sampling did not mix": the same degeneracy as Section 3b, and the reason the authors chose a small decay.
+
+```{r explore}
+## (a) Opposition named by the receiver (j names i) instead of the sender
+alt_a <- update(fit1, . ~ . - edgecov(O) + edgecov(t(O)))
+summary(alt_a)
+c(fit1 = BIC(fit1), receiver_opp = BIC(alt_a))
+
+## (b) Larger closure decay
+## >>> COMMENT OUT BEFORE KNITTING <<<  Fails (degeneracy); run it live in class.
+# alt_b <- update(fit1, . ~ . - gwesp(0.25, fixed = TRUE) + gwesp(0.75, fixed = TRUE))
+```
+
+> **In our run:** with opposition reported by the receiver, the opponent effect falls from +1.59 to +0.69 (p = 0.053), and BIC rises from 1213 to 1230. Actors collaborate with those *they* call opponents much more than with those who call *them* opponents. So the "cooperation across divides" finding rests largely on one-sided perception. The structural terms barely move (`gwidegree` −1.06, `gwesp` +1.17), so H1 and closure are robust to this choice.
 
 ### 4c. What does the `gwidegree` sign mean?
 
-Simulate from the fitted model. This tests the interpretation behind H1: does a negative coefficient mean concentration?
+**Extension.** Simulate from the fitted model with the `gwidegree` coefficient set to its negative and positive values. This tests the interpretation behind H1: does a negative coefficient mean concentration? `sna::centralization()` measures how unequally in-ties are spread (0 = equal, 1 = one actor receives all).
 
 ```{r chunk-18}
 k <- grep("gwideg", names(coef(fit1)))
 for (b in c(-abs(coef(fit1)[k]), abs(coef(fit1)[k]))) {
   th <- coef(fit1); th[k] <- b
-  s <- simulate(fit1, coef = th, nsim = 20)
+  s <- simulate(fit1, coef = th, nsim = 20, seed = 123)
   cent <- sapply(s, function(x) sna::centralization(x, sna::degree, cmode = "indegree"))
   cat("gwidegree =", round(b, 2), "| mean edges:", round(mean(sapply(s, network.edgecount))),
       "| mean in-degree centralization:", round(mean(cent), 3), "\n")
 }
 ```
 
-> **In our run:** the negative value gives higher in-degree centralization (0.48 vs. 0.41), even though the positive value produces twice as many edges (465 vs. 229). Negative means concentration, which confirms the authors' reading (citing Levy 2016). Contrast with `istar2` in 3a, where positive means centralization.
+> **In our run:** the negative value gives higher in-degree centralization (0.48 vs. 0.37), even though the positive value produces almost twice as many edges (481 vs. 262). Negative means concentration, which confirms the authors' reading (citing Levy 2016). Contrast with `istar2` in 3a, where positive means centralization.
 
 ------------------------------------------------------------------------
 
@@ -344,23 +569,24 @@ for (b in c(-abs(coef(fit1)[k]), abs(coef(fit1)[k]))) {
 
 **Method point:** coefficients are not comparable across networks of different size and density, so compare predicted tie probabilities instead.
 
+**Replication** of SI Table 4: the same specification in each country, estimated with seed 123. If a model fails to converge under current ergm, we fall back to the authors' saved fit.
+
 ```{r chunk-19}
-fit_country <- function(cc, seed = 123) {
+fit_country <- function(cc) {
   g <- nw[[cc]]; O <- opp[[cc]]; B <- belief[[cc]]; I <- instr[[cc]]; lv <- gov[cc]
   ergm(g ~ edges + edgecov(O) + gwesp(0.25, fixed = TRUE) +
          gwidegree(1.4, fixed = TRUE) + edgecov(B) + edgecov(I) + mutual +
          nodeofactor("actorType", levels = lv) + nodeifactor("actorType", levels = lv) +
          nodeocov("repuTarget") + absdiff("repuTarget"),
-       control = control.ergm(seed = seed))
+       control = control.ergm(seed = 123))
 }
 
-## Retry with the authors' alternative seed; fall back to their saved fit.
 fits <- lapply(names(nw), function(cc)
   tryCatch(fit_country(cc),
-           error = function(e) tryCatch(fit_country(cc, seed = 1234),
-                                        error = function(e2) {
-                                          load(sprintf("1_Analysis/output/ERGM_estimates/fit1%s.RData", cc))
-                                          get(paste0("fit1", cc)) })))
+           error = function(e) {
+             message(cc, ": did not converge; using the authors' saved fit")
+             load(file.path(base, sprintf("1_Analysis/output/ERGM_estimates/fit1%s.RData", cc)))
+             get(paste0("fit1", cc)) }))
 names(fits) <- names(nw)
 
 ## The authors' saved fit uses different coefficient names; map them onto one row each.
@@ -378,16 +604,17 @@ cm <- list("edges" = "Edges",
 texreg::screenreg(fits, custom.coef.map = cm)
 ```
 
-> **In our run:** the Dutch model failed with both seeds, so the NL column uses the authors' saved fit (ergm 3.11.0). With 16 actors and 11 parameters, the curved terms could not be estimated under current ergm, which is itself a lesson in fragility.
-
-> NL: GWESP is positive but not significant (1.81, SE 1.04), and opponent ties are weakly positive (0.92, p < 0.05). This matches the paper: no closure in the Netherlands and only weak collaboration with opponents.
-
+> **In our run:** the Swiss column shows `gwidegree` −1.12 rather than 4a's −1.09 because `fit_country()` uses the default MCMC interval. The Dutch model did not converge, so the NL column uses the authors' saved fit (ergm 3.11.0). With 16 actors and 11 parameters, the curved terms could not be estimated under current ergm, which is itself a lesson in fragility.
+>
+> **NL:** GWESP is positive but not significant (1.81, SE 1.04), and opponent ties are weakly positive (0.92, p < 0.05). This matches the paper: no closure in the Netherlands and only weak collaboration with opponents.
 >
 > **H1:** `gwidegree` is −1.12 in CH and DE, −2.33 in FR, and −3.15 in NL. Centralization is strongest in the unitary systems, consistent with H1. Coefficients are not strictly comparable across networks, but the pattern matches the paper's predicted-probability results.
 >
 > **Belief dissimilarity:** negative in DE (−0.63) and FR (−0.77). The paper reports an effect only for FR because its main results come from the model with the opponent × belief interaction; this table uses the model without it (SI Table 4).
 
 ### Predicted probability of a tie to an opponent vs. a non-opponent (H2 quality)
+
+**Partial replication.** The paper reports bootstrapped relative probabilities from the interaction model (Figure 5). We report simple mean predicted probabilities from the model without interaction. `edgeprob()` computes each dyad's tie probability from its change statistics and the estimated coefficients, so it is deterministic and needs no seed.
 
 ```{r chunk-20}
 probs <- lapply(fits, function(f) tryCatch(suppressWarnings(btergm::edgeprob(f)),
@@ -399,3 +626,11 @@ sapply(probs, function(d) tapply(d$probability, d[, grep("edgecov.O", names(d))]
 > Rows: 0 = non-opponent, 1 = opponent. `edgeprob()` cannot read the authors' older NL object, so only CH, DE, and FR appear.
 >
 > **In our run:** naming someone as an opponent raises the tie probability from 0.11 to 0.41 in CH, 0.11 to 0.50 in DE, and 0.26 to 0.59 in FR. In relative terms the jump is larger in the consensus systems (×3.6 in CH, ×4.4 in DE vs. ×2.3 in FR), and the opponent coefficient is significant in CH and DE but not FR, consistent with H2.
+
+------------------------------------------------------------------------
+
+## Session information
+
+```{r session-info, cache = FALSE}
+sessionInfo()
+```
