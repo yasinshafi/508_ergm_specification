@@ -25,6 +25,28 @@ Each code chunk is labeled as one of:
 
 ------------------------------------------------------------------------
 
+### Background: consensus vs. majoritarian democracy
+
+Lijphart distinguishes two visions of democracy by how they answer one question: *who governs when people disagree?*
+
+-   **Majoritarian democracy** concentrates power in the hands of the majority. A single party typically controls the cabinet, elections are first-past-the-post, the state is unitary, and interest groups compete with one another (pluralism). The winner governs and the loser waits for the next election. In policy networks, this predicts **concentrated power** and **limited contact with opponents**: decisions run through a few central actors, and competitors are kept out rather than bargained with.
+-   **Consensus democracy** spreads power across many actors. It has multi-party coalition cabinets, proportional representation, federalism, and corporatist arrangements that bring interest groups into policymaking. No single actor can decide alone, so agreement must be built. In policy networks, this predicts **diffused power** and **dense, cooperative ties that cross divides**, because institutions such as consultation procedures and working groups bring opponents into regular contact.
+
+In this paper, Switzerland and Germany are consensual–federal, France is majoritarian–unitary, and the Netherlands is a consensual–unitary hybrid.
+
+### Background: Advocacy Coalition Framework
+
+Which beliefs bind a coalition?
+
+| Belief layer | Content | Example in this paper | Shared within a coalition? | Expected effect of dissimilarity on collaboration |
+|---|---|---|---|---|
+| **Deep core** | Fundamental values across all policy areas (left/right, role of the state) | Not measured | Not required | Weak or none |
+| **Policy core** | Positions within one policy area: seriousness and causes of the problem, priority of values, basic strategy | Belief items: act at the source vs. end-of-pipe, precaution, wait for evidence, eliminate the substance | **Yes. Defines the coalition** | **Negative** (`edgecov(B)`) |
+| **Secondary aspects** (instrumental beliefs) | Specific means: which tool, regulation, or budget | Instrument items: bans on single substances, discharge requirements | Not required; negotiable | Weaker (`edgecov(I)`) |
+
+> **Note:** ACF predicts *coalitions*, but the paper's outcome is *collaboration*, which also includes bargaining with opponents. Keep the ACF expectation in mind when reading the belief and instrument coefficients in Sections 2, 4a, and 5.
+
+
 ## The paper's argument
 
 Following Lijphart, political systems shape policy networks. Consensus democracies (CH, DE; NL as a hybrid) diffuse power and push actors to bargain with opponents. Majoritarian democracies (FR) concentrate power and exclude competitors.
@@ -66,26 +88,6 @@ The same survey asked each actor to name **opponents** (actors it disagreed with
 | Quality 1 | `edgecov(opponents)`            | \+ in consensus systems   |
 | Quality 2 | `edgecov(belief dissimilarity)` | −, strongest in FR        |
 
-### Background: consensus vs. majoritarian democracy
-
-Lijphart distinguishes two visions of democracy by how they answer one question: *who governs when people disagree?*
-
--   **Majoritarian democracy** concentrates power in the hands of the majority. A single party typically controls the cabinet, elections are first-past-the-post, the state is unitary, and interest groups compete with one another (pluralism). The winner governs and the loser waits for the next election. In policy networks, this predicts **concentrated power** and **limited contact with opponents**: decisions run through a few central actors, and competitors are kept out rather than bargained with.
--   **Consensus democracy** spreads power across many actors. It has multi-party coalition cabinets, proportional representation, federalism, and corporatist arrangements that bring interest groups into policymaking. No single actor can decide alone, so agreement must be built. In policy networks, this predicts **diffused power** and **dense, cooperative ties that cross divides**, because institutions such as consultation procedures and working groups bring opponents into regular contact.
-
-In this paper, Switzerland and Germany are consensual–federal, France is majoritarian–unitary, and the Netherlands is a consensual–unitary hybrid.
-
-### Background: Advocacy Coalition Framework
-
-Which beliefs bind a coalition?
-
-| Belief layer | Content | Example in this paper | Shared within a coalition? | Expected effect of dissimilarity on collaboration |
-|---|---|---|---|---|
-| **Deep core** | Fundamental values across all policy areas (left/right, role of the state) | Not measured | Not required | Weak or none |
-| **Policy core** | Positions within one policy area: seriousness and causes of the problem, priority of values, basic strategy | Belief items: act at the source vs. end-of-pipe, precaution, wait for evidence, eliminate the substance | **Yes. Defines the coalition** | **Negative** (`edgecov(B)`) |
-| **Secondary aspects** (instrumental beliefs) | Specific means: which tool, regulation, or budget | Instrument items: bans on single substances, discharge requirements | Not required; negotiable | Weaker (`edgecov(I)`) |
-
-> **Note:** ACF predicts *coalitions*, but the paper's outcome is *collaboration*, which also includes bargaining with opponents. Keep the ACF expectation in mind when reading the belief and instrument coefficients in Sections 2, 4a, and 5.
 
 **Findings.** All four networks are centralized, more steeply in FR and NL (H1 supported). There is closure in CH, DE, and FR but not NL. Opponent ties are positive in CH and DE (weakly in NL) and null in FR. Belief dissimilarity matters only in FR. France is dense because opponents are excluded, not because of consensus-seeking.
 
