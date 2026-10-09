@@ -614,21 +614,48 @@ texreg::screenreg(fits, custom.coef.map = cm)
 >
 > **Belief dissimilarity:** negative in DE (−0.63) and FR (−0.77). The paper reports an effect only for FR because its main results come from the model with the opponent × belief interaction; this table uses the model without it (SI Table 4).
 
-### Predicted probability of a tie to an opponent vs. a non-opponent (H2 quality)
+### Counterfactual: what does naming someone an opponent change? (H2 quality)
 
-**Partial replication.** The paper reports bootstrapped relative probabilities from the interaction model (Figure 5). We report simple mean predicted probabilities from the model without interaction. `edgeprob()` computes each dyad's tie probability from its change statistics and the estimated coefficients, so it is deterministic and needs no seed.
+**Partial replication** of the paper's Figure 5. A simple comparison of opponent and non-opponent pairs would mix the opponent effect with every other way those pairs differ (more shared partners, more reciprocity, more prominent actors), and would largely repeat the raw gap in Section 0. Instead we ask a *what-if* question of the model, pair by pair:
+
+1. `ergmMPLE(..., output = "dyadlist")` gives, for every pair of actors, its change statistics: how much each model term would change if the tie i → j were added.
+2. For each pair, we compute the tie probability twice from the estimated coefficients: once with the opponent indicator set to **1** and once set to **0**. Everything else about the pair stays fixed.
+3. We average across all pairs. The gap is the model's estimate of what opposition alone does to the chance of collaboration.
+
+`p_observed` uses each pair's real opponent label and should fall between `p_not_opponent` and `p_opponent`. The paper uses the model with the opponent × belief interaction and bootstraps confidence intervals; we use the model without the interaction and report point estimates.
 
 ```{r chunk-20}
-probs <- lapply(fits, function(f) tryCatch(suppressWarnings(btergm::edgeprob(f)),
-                                           error = function(e) NULL))
-probs <- Filter(Negate(is.null), probs)
-sapply(probs, function(d) tapply(d$probability, d[, grep("edgecov.O", names(d))], mean))
+## Counterfactual: for every pair i -> j, set the opponent indicator to 1 and to 0,
+## holding all its other change statistics fixed (deterministic; no seed needed)
+cf_opp <- function(f) {
+  th <- coef(f)
+  if (!"edgecov.O" %in% names(th)) return(NULL)      # skips the authors' saved NL fit
+  dl <- ergmMPLE(f$formula, output = "dyadlist")      # one row per pair, change statistics
+  X  <- dl$predictor[, names(th), drop = FALSE]       # columns named exactly like coef()
+  k  <- which(names(th) == "edgecov.O")
+  X1 <- X; X1[, k] <- 1                               # as if i named j as an opponent
+  X0 <- X; X0[, k] <- 0                               # as if i did not
+  p1 <- plogis(drop(X1 %*% th))
+  p0 <- plogis(drop(X0 %*% th))
+  c(p_observed      = mean(plogis(drop(X %*% th))),  # with the real opponent labels
+    p_not_opponent  = mean(p0),
+    p_opponent      = mean(p1),
+    difference      = mean(p1 - p0),
+    median_rel_prob = median(p1 / p0))
+}
+
+res <- Filter(Negate(is.null), lapply(fits, cf_opp))
+round(do.call(cbind, res), 3)
 ```
 
-> Rows: 0 = non-opponent, 1 = opponent. `edgeprob()` cannot read the authors' older NL object, so only CH, DE, and FR appear.
+> **What we see:**
 >
-> **In our run:** naming someone as an opponent raises the tie probability from 0.11 to 0.41 in CH, 0.11 to 0.50 in DE, and 0.26 to 0.59 in FR. In relative terms the jump is larger in the consensus systems (×3.6 in CH, ×4.4 in DE vs. ×2.3 in FR), and the opponent coefficient is significant in CH and DE but not FR, consistent with H2.
-
+> - Switching only the opponent label: CH 0.12 → 0.29 (median ×3.9), DE 0.13 → 0.29 (×4.4), FR 0.27 → 0.43 (×2.3).
+> - Gain is about 0.16–0.17 in all three countries. The raw gap in Section 0 was 0.29–0.36. About half of the raw gap is the opponent effect; the rest comes from other differences between opponent and non-opponent pairs (shared partners, reciprocity, prominent actors).
+> - Absolute gain is similar across countries. Relative gain is not: about ×4 in CH and DE, ×2 in FR, because CH and DE start from a lower baseline (0.12 vs. 0.27).
+> - Consistent with H2: opposition raises collaboration more, in relative terms, in the consensus systems.
+> - FR is the least certain: its opponent coefficient is not significant, and these are point estimates without confidence intervals.
+> - NL is skipped. Its column comes from the authors' saved fit, where the opponent term is named `edgecov.oppNL`.
 ------------------------------------------------------------------------
 
 ## Session information
