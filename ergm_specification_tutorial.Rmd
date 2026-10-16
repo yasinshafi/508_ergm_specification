@@ -268,7 +268,7 @@ t(sapply(names(nw), function(cc) {
 }))
 ```
 
-> **What we see:** in every country, actors collaborate more with those they name as opponents than with others. The jump is about ×4 in CH (0.39 vs. 0.10) and DE (0.47 vs. 0.11) but only about ×2 in FR and NL, where the dense small networks raise the baseline. France names only 14 opponents, so `edgecov(O)` has little variation there.
+> **What we see:** in every country, actors collaborate more with those they name as opponents than with others. The jump is about ×4 in CH (0.39 vs. 0.10) and DE (0.47 vs. 0.11) but only about ×2 in FR and NL, where the dense small networks raise the baseline. France names only 14 opponents, so `edgecov(O)` has little variation there. Section 5 asks how much of this gap remains once other differences between the pairs are held fixed.
 
 ### Belief dissimilarity among tied and untied pairs
 
@@ -422,22 +422,62 @@ summary(m_markov)
 
 ### 3b. Degeneracy on this network
 
-**Extension.** This model contains only Markov terms: edges, `mutual`, `istar(2)`, `ostar(2)`, and `ttriple`. Each additional configuration counts at full weight with no down-weighting. Fitting it by MPLE (maximum pseudo-likelihood) treats each tie as a logistic regression given the rest of the network. It runs fast, but its estimates can describe a model that does not reproduce the network it was fitted to. We then push the transitive-triple parameter up and simulate.
+**Extension.** This model contains only Markov terms: edges, `mutual`, `istar(2)`, `ostar(2)`, and `ttriple`. We fit it by MPLE (maximum pseudo-likelihood), which treats each tie as a logistic regression *given the rest of the observed network*. MPLE only looks at small changes around the network we observed; it never checks what the model implies for networks far from it.
 
-```{r chunk-12}
+**Why this goes wrong.** Markov counts grow much faster than edges. Adding ties raises the number of 2-stars roughly with the square of each actor's degree, and the number of triangles faster still. Near the observed 241 edges, a modest positive star or triangle coefficient looks harmless, balanced by the negative `edges` term. But once a few ties are added, the star and triangle counts outgrow the edge penalty, each new tie makes the next one more likely, and the network runs away to the complete graph. The estimates fit the observed network locally, yet the model they define puts nearly all its probability on the complete graph. This is **degeneracy**.
+
+We show it two ways:
+
+- **(a) Trace:** start a simulation at the observed network and follow the edge count, step by step. We compare the MPLE Markov model with the 3a model (also Markov stars, but estimated by MCMC with `gwesp` for closure), which stays near the observed network.
+- **(b) Sensitivity:** nudge the `ttriple` coefficient upward and see where the simulated networks end up.
+
+```{r chunk-12, fig.height = 4.5}
 m_mple <- ergm(g ~ edges + mutual + istar(2) + ostar(2) + ttriple,
                estimate = "MPLE")
+round(coef(m_mple), 3)
+
+## (a) Trace: start at the observed network, no burn-in, record the edge count
+ctrl_trace <- control.simulate.ergm(MCMC.burnin = 0, MCMC.interval = 50)
+tr_mple <- simulate(m_mple,   nsim = 200, output = "stats", seed = 123,
+                    control = ctrl_trace)[, "edges"]
+tr_3a   <- simulate(m_markov, nsim = 200, output = "stats", seed = 123,
+                    control = ctrl_trace)[, "edges"]
+
+## (b) Sensitivity: push the transitive-triple coefficient up
 theta <- coef(m_mple)
-for (bump in c(0, 0.25, 0.5, 1)) {
+bumps <- c(0, 0.25, 0.5, 1)
+sim_edges <- sapply(bumps, function(bump) {
   th <- theta; th["ttriple"] <- th["ttriple"] + bump
-  s <- simulate(m_mple, coef = th, nsim = 50, output = "stats", seed = 123,
-                control = control.simulate.ergm(MCMC.burnin = 20000))
-  cat("ttriple +", bump, ": mean edges =", round(mean(s[, "edges"])),
-      " (observed", network.edgecount(g), ")\n")
-}
+  simulate(m_mple, coef = th, nsim = 50, output = "stats", seed = 123,
+           control = control.simulate.ergm(MCMC.burnin = 20000))[, "edges"]
+})
+colnames(sim_edges) <- paste0("+", bumps)
+
+n_dyads <- network.size(g) * (network.size(g) - 1)        # 2,162 possible ties
+par(mfrow = c(1, 2), mar = c(4.5, 4.5, 2.5, 1))
+plot(tr_mple, type = "l", lwd = 2, col = "#D55E00", ylim = c(0, n_dyads),
+     xlab = "Simulation step (x 50 proposals)", ylab = "Edges",
+     main = "(a) Simulation trace")
+lines(tr_3a, lwd = 2, col = "#0072B2")
+abline(h = network.edgecount(g), lty = 2)
+abline(h = n_dyads, lty = 3, col = "grey50")
+legend("topleft", bty = "n", lwd = c(2, 2, 1, 1), lty = c(1, 1, 2, 3),
+       col = c("#D55E00", "#0072B2", "black", "grey50"),
+       legend = c("Markov model (MPLE)", "3a model (MCMC)", "Observed (241)", "Complete graph"))
+boxplot(sim_edges, ylim = c(0, n_dyads), col = "grey85",
+        xlab = "Increase in ttriple coefficient", ylab = "Edges in simulated networks",
+        main = "(b) Raising ttriple")
+abline(h = network.edgecount(g), lty = 2)
+abline(h = n_dyads, lty = 3, col = "grey50")
+par(mfrow = c(1, 1))
 ```
 
-> **In our run:** even at the MPLE estimates themselves, simulated networks average 2,160 of 2,162 possible edges (observed 241), and pushing `ttriple` up only fills the remaining dyads. The Markov model cannot reproduce the network it was fitted to: its probability mass sits on the complete graph. This is degeneracy. Curved terms (Section 4) damp it.
+> **In our run:** the MPLE estimates are `edges` −4.57, `mutual` +1.10, `istar2` +0.10, `ostar2` +0.09, `ttriple` +0.24. Each star and triangle coefficient is small, but they apply to counts that grow much faster than edges.
+>
+> - **(a)** Starting from the observed network, the Markov model stays near 241 edges for about 60 steps, then takes off and passes 1,700 edges by step 200, still climbing toward the complete graph. The 3a model, estimated by MCMC, stays between about 200 and 300 throughout.
+> - **(b)** Even with no change to the coefficients (+0), simulated networks are near-complete (about 2,160 of 2,162 edges). Raising `ttriple` changes nothing because there is nowhere left to go.
+>
+> The MPLE estimates describe the observed network locally, but the model they define puts almost all its probability on the complete graph. That is degeneracy.
 
 ------------------------------------------------------------------------
 
@@ -449,7 +489,7 @@ for (bump in c(0, 0.25, 0.5, 1)) {
 -   `gwesp` → H2 quantity: close-knit collaboration (expect + in CH)
 -   `edgecov(O)`, `edgecov(B)` → H2 quality, now net of structure
 
-**Method points:** diagnostics, GOF, replication, decay choice, and how to read the sign of a curved term.
+**Method points:** diagnostics, GOF on statistics outside the model, replication, decay choice, how to read the sign of a curved term, and choosing among specifications.
 
 ### 4a. Replicate the authors' main model without interaction (SI Table 4)
 
@@ -483,17 +523,65 @@ summary(fit1)
 mcmc.diagnostics(fit1)
 ```
 
-> **In our run:** autocorrelation at the first lag is about 0.64 with the longer MCMC interval (about 0.80 with ergm's default), and Geweke tests pass (joint p = 0.43).
+> **In our run:** autocorrelation at the first lag is about 0.64 with the longer MCMC interval (about 0.80 with ergm's default), and Geweke tests pass (joint p = 0.43). The joint (Omni) test of simulated vs. observed statistics gives p = 0.004, though no single statistic differs (all p ≥ 0.28). These diagnostics come from the last MCMC round before the final estimates; the GOF below checks the final model.
 
-**Partial replication.** The paper reports goodness of fit (Figure 2) using `btergm::gof(..., rocpr)` on the interaction model. We use ergm's GOF on the model without interaction. `btergm` overrides `plot()` for GOF objects, so we call ergm's method directly. GOF simulates networks, so we set the seed.
+**Partial replication.** The paper reports goodness of fit (Figure 2) using `btergm::gof(..., rocpr)` on the interaction model. We use ergm's GOF on the model without interaction.
 
-```{r chunk-15}
-gof_fit1 <- ergm::gof(fit1, control = control.gof.ergm(seed = 123))
-round(gof_fit1$summary.model, 2)          # model statistics: observed vs. simulated
-par(mfrow = c(2, 3)); ergm:::plot.gof(gof_fit1); par(mfrow = c(1, 1))
+**Which statistics to check.** At the maximum likelihood estimate, the simulated networks reproduce the *model's own* statistics by construction: the estimate is the value that makes their expected values equal the observed ones. So the real test is statistics the model was **not** fit to:
+
+-   **In-degree distribution:** how many actors receive 0, 1, 2, … nominations. This is the pattern H1 is about.
+-   **Out-degree distribution:** how many nominations each actor sends.
+-   **Edgewise shared partners:** for each tie, how many partners the two actors share. This checks closure.
+-   **Geodesic distances:** how many steps separate pairs of actors. This checks the network's overall reach.
+
+We run the same check on the in-2-star model from 3a. The authors report that `gwidegree` fits the Swiss in-degree distribution poorly and use the in-2-star model as a robustness check; the comparison shows whether that holds here. GOF simulates networks, so we set the seed.
+
+```{r chunk-15, fig.height = 7}
+gof_aux <- ~ idegree + odegree + espartners + distance
+gof_fit1 <- ergm::gof(fit1,     GOF = gof_aux, control = control.gof.ergm(seed = 123))
+gof_3a   <- ergm::gof(m_markov, GOF = gof_aux, control = control.gof.ergm(seed = 123))
+
+## Compact verdict: for each statistic, how many values fall outside the
+## simulated range, and how many have MC p < 0.05
+gof_check <- function(gf) {
+  s <- gf[grep("^summary\\.(ideg|odeg|espart|dist)$", names(gf))]
+  t(sapply(s, function(m) c(values        = nrow(m),
+                            outside_range = sum(m[, "obs"] < m[, "min"] | m[, "obs"] > m[, "max"]),
+                            p_below_05    = sum(m[, "MC p-value"] < 0.05, na.rm = TRUE))))
+}
+list(main_gwidegree = gof_check(gof_fit1), in2star_3a = gof_check(gof_3a))
+
+## All auxiliary statistics for the main model
+par(mfrow = c(2, 2)); ergm:::plot.gof(gof_fit1); par(mfrow = c(1, 1))
 ```
 
-> **In our run:** every model statistic is reproduced well by the simulated networks (all MC p-values ≥ 0.56). Check the plots for the auxiliary statistics, especially in-degree, which the authors flag as the weak spot of this specification.
+**In-degree, side by side.** Observed counts (black line) against the simulated mean (points) and range (grey bars), for both models.
+
+```{r chunk-15b, fig.height = 4}
+plot_ideg <- function(gf, main) {
+  m <- gf$summary.ideg
+  k <- as.integer(rownames(m)); keep <- k <= max(k[m[, "obs"] > 0]) + 3
+  m <- m[keep, , drop = FALSE]; k <- k[keep]
+  plot(k, m[, "obs"], type = "n", ylim = range(m[, c("min", "max", "obs")]),
+       xlab = "In-degree", ylab = "Number of actors", main = main)
+  segments(k, m[, "min"], k, m[, "max"], col = "grey70", lwd = 6)
+  points(k, m[, "mean"], pch = 19, col = "#0072B2")
+  lines(k, m[, "obs"], lwd = 2)
+}
+par(mfrow = c(1, 2))
+plot_ideg(gof_fit1, "Main model (gwidegree)")
+plot_ideg(gof_3a,   "3a model (istar(2))")
+par(mfrow = c(1, 1))
+```
+
+> **In our run:** both models reproduce geodesic distances well, and the main model reproduces edgewise shared partners. The differences are in the degree distributions.
+>
+> - **In-degree (main model):** one value falls outside the simulated range and two have MC p < 0.05. The model expects too many actors that nobody names (about 7 vs. 4 observed) and too few with two nominations (about 4 vs. 9). It also rarely produces anything like the single hub named by 38 of the other 46 actors.
+> - **In-degree (3a, `istar(2)`):** no values outside the range and no p < 0.05. Simulated counts track the observed distribution more closely, including the low end.
+> - **Trade-off:** the in-2-star model fits in-degree better but loses a little on closure (one shared-partner value outside the range). Both models miss one very active sender in the out-degree distribution.
+> - This matches the authors' footnote: `gwidegree` fits the Swiss in-degree distribution poorly, which is why they report the in-2-star model as a robustness check. The H1 conclusion holds either way (both terms show concentration), but the curved term smooths over the hub structure.
+>
+> The "model statistics" panel in the first figure is the by-construction check described above; ergm adds it automatically.
 
 **Extension.** Benchmark against the authors' saved estimate (ergm 3.11.0):
 
@@ -506,22 +594,57 @@ round(cbind(ours = coef(fit1), authors = coef(fit1CH)), 3)
 
 ### 4b. Specification choices the authors fixed
 
-We change one at a time. This tests whether the H1 and H2 conclusions depend on these choices. Both refits reuse `fit1`'s control settings, including seed 123.
+We change one at a time. This tests whether the H1 and H2 conclusions depend on these choices. Every refit reuses `fit1`'s control settings, including seed 123.
 
--   **Decay 0.5 instead of 1.4 (partial replication):** the paper says it compared decay values by BIC but does not report them. A lower decay discounts additional in-ties faster, so the term responds to whether actors have *any* in-ties more than to how many.
+-   **Decay grid (partial replication):** the paper says the authors chose the `gwidegree` decay by comparing BIC across values but does not report the comparison. We refit `fit1` with decay 0.25, 0.5, 1, 1.4, 2, and 3, record each BIC and whether the fit converged, and plot BIC against decay. A lower decay discounts additional in-ties faster, so the term responds to whether actors have *any* in-ties more than to how many. The `gwidegree` coefficient itself changes with the decay, so its size can only be read together with the decay (Levy 2016). At large decays the term behaves like an in-2-star term.
 -   **`dgwdsp(0.25, fixed = TRUE, type = "OTP")` (extension):** geometrically weighted *dyadwise* shared partners. It counts shared partners for all pairs, tied or not. Including it with `gwesp` separates closure (shared partners on actual ties) from simply having many two-paths.
 
-```{r chunk-17}
-fit1_dec <- update(fit1, . ~ . - gwidegree(1.4, fixed = TRUE) +
-                     gwidegree(0.5, fixed = TRUE))                # decay
+```{r chunk-17, fig.height = 4}
+## Decay grid for gwidegree (fit1 already uses 1.4; every refit reuses fit1's control, seed 123)
+decays <- c(0.25, 0.5, 1, 1.4, 2, 3)
+fit_decay <- function(d) {
+  if (d == 1.4) return(fit1)
+  tryCatch(update(fit1, as.formula(paste0(". ~ . - gwidegree(1.4, fixed = TRUE)",
+                                          " + gwidegree(", d, ", fixed = TRUE)"))),
+           error = function(e) NULL)
+}
+decay_fits <- lapply(decays, fit_decay)
+
+decay_tab <- data.frame(
+  decay     = decays,
+  converged = !sapply(decay_fits, is.null),
+  BIC       = sapply(decay_fits, function(f) if (is.null(f)) NA else round(BIC(f), 1)),
+  gwideg    = sapply(decay_fits, function(f) if (is.null(f)) NA else
+                round(coef(f)[grep("gwideg", names(coef(f)))], 2)),
+  row.names = NULL)
+decay_tab
+
+ok <- decay_tab$converged
+plot(decay_tab$decay[ok], decay_tab$BIC[ok], type = "b", pch = 19, lwd = 2,
+     xlab = "gwidegree decay", ylab = "BIC (lower is better)", xaxt = "n",
+     main = "Choosing the decay by BIC",
+     ylim = range(decay_tab$BIC, na.rm = TRUE) + c(-5, 5))
+axis(1, at = decays)
+if (any(!ok)) {
+  points(decay_tab$decay[!ok], rep(par("usr")[3], sum(!ok)), pch = 4, cex = 2,
+         col = "#D55E00", xpd = TRUE)
+  legend("topright", pch = 4, col = "#D55E00", legend = "did not converge", bty = "n")
+}
+fit1_dec <- decay_fits[[which(decays == 0.5)]]    # kept for the summary table
+
+## 2-path control (extension)
 fit1_dsp <- tryCatch(update(fit1, . ~ . + dgwdsp(0.25, fixed = TRUE, type = "OTP")),
-                     error = function(e) NULL)                     # 2-path control
-is.null(fit1_dsp)                                                 # TRUE = the dgwdsp model failed
-sapply(Filter(Negate(is.null),
-              list(main = fit1, decay0.5 = fit1_dec, plus_gwdsp = fit1_dsp)), BIC)
+                     error = function(e) NULL)
+is.null(fit1_dsp)                                  # TRUE = the dgwdsp model failed
 ```
 
-> **In our run:** adding the 2-path control (`dgwdsp`) made the sampler stop mixing, which is degeneracy from one extra term. Changing the `gwidegree` decay from 1.4 to 0.5 raises BIC from 1213 to 1220, so the authors' choice of 1.4 fits better, matching their BIC-based selection. Their footnote reports the same fragility: changing the in-degree decay made the DE, FR, and NL models degenerate.
+> **In our run:**
+>
+> - All six decay values converge. BIC falls steadily as the decay rises: 1221 (0.25), 1220 (0.5), 1215 (1), 1213 (1.4), 1204 (2), 1196 (3). The authors' 1.4 is not the best value on this grid; 3 is better by 17 points, far beyond the Monte Carlo error of about 0.5.
+> - Why: as the decay grows, `gwidegree` approaches *edges minus e^(−decay) × in-2-stars*. The edges part is absorbed by the `edges` term, so a large decay turns the curved term into a Markov in-2-star term. The implied in-2-star effect at decay 3 is about +0.13, the same sign and order as the +0.068 of model 3a, and the BIC (1196) is close to 3a's (1198). The search has no interior minimum because the Swiss data, with one actor named by 38 others, keep pulling the term toward its Markov limit.
+> - Why the authors still use 1.4: a decay chosen for Switzerland alone is not the goal. Their footnote reports that changing the decay made the DE, FR, and NL models degenerate. One specification must work in all four networks, so the decay is set by the smallest, densest networks.
+> - The coefficient grows with the decay (−0.29 to −2.59) but stays negative throughout. Its size means nothing without its decay; its sign, and the H1 conclusion, hold for every value.
+> - Adding the 2-path control (`dgwdsp`) made the sampler stop mixing: degeneracy from one extra term.
 
 ### Try it yourself
 
@@ -559,6 +682,63 @@ for (b in c(-abs(coef(fit1)[k]), abs(coef(fit1)[k]))) {
 ```
 
 > **In our run:** the negative value gives higher in-degree centralization (0.48 vs. 0.37), even though the positive value produces almost twice as many edges (481 vs. 262). Negative means concentration, which confirms the authors' reading (citing Levy 2016). Contrast with `istar2` in 3a, where positive means centralization.
+
+### 4d. Specification summary
+
+**Extension.** Every Swiss model in this tutorial, side by side. All are fitted to the same network, so their BICs are comparable; for MCMC models BIC is approximate (Monte Carlo error about 0.5), so differences of a point or two mean nothing. The GOF columns use the statistics *outside* the model (in-degree, out-degree, edgewise shared partners, geodesic distances), as in 4a: `outside_range` counts observed values outside the simulated range, `p_below_05` counts values with MC p < 0.05, and `misfit` lists the statistics where either occurs.
+
+```{r chunk-18b}
+gof_brief <- function(f, gf = NULL) {
+  if (is.null(f)) return(list(outside = NA, p05 = NA, misfit = "—"))
+  if (is.null(gf)) gf <- ergm::gof(f, GOF = gof_aux, control = control.gof.ergm(seed = 123))
+  ch  <- gof_check(gf)
+  bad <- sub("summary\\.", "", rownames(ch)[ch[, "outside_range"] > 0 | ch[, "p_below_05"] > 0])
+  list(outside = sum(ch[, "outside_range"]), p05 = sum(ch[, "p_below_05"]),
+       misfit = if (length(bad)) paste(bad, collapse = ", ") else "none")
+}
+
+specs <- list(
+  "Covariates only (2)"              = list(m_exo,    NULL),
+  "Reputation as receiver (2)"       = list(m_exo_i,  NULL),
+  "In-2-star (3a)"                   = list(m_markov, gof_3a),
+  "Main: gwidegree 1.4 (4a)"         = list(fit1,     gof_fit1),
+  "gwidegree decay 0.5 (4b)"         = list(decay_fits[[which(decays == 0.5)]], NULL),
+  "gwidegree decay 2 (4b)"           = list(decay_fits[[which(decays == 2)]],   NULL),
+  "gwidegree decay 3 (4b)"           = list(decay_fits[[which(decays == 3)]],   NULL),
+  "+ dgwdsp 2-path control (4b)"     = list(fit1_dsp, NULL),
+  "Receiver-reported opponents"      = list(alt_a,    NULL))
+
+spec_tab <- do.call(rbind, lapply(names(specs), function(nm) {
+  f <- specs[[nm]][[1]]; gb <- gof_brief(f, specs[[nm]][[2]])
+  data.frame(model         = nm,
+             converged     = !is.null(f),
+             BIC           = if (is.null(f)) NA else round(BIC(f), 1),
+             outside_range = gb$outside,
+             p_below_05    = gb$p05,
+             misfit        = gb$misfit,
+             row.names = NULL)
+}))
+spec_tab[order(spec_tab$BIC), ]
+```
+
+> **In our run:**
+>
+> - Covariate-only models (Section 2): BIC 1364 and 1273, 21 auxiliary values outside the simulated range. Without network terms the model cannot reproduce the structure.
+> - Models with network terms: BIC 1196–1230; 0–3 values outside the range.
+> - `gwidegree` decay 3: lowest BIC (1196.1), no values outside the range, one with p < 0.05 (out-degree). Best on both counts. The out-degree misfit (one very active sender) appears in every model.
+> - In-2-star (3a): BIC 1197.5, about 1.4 points from decay 3. Same model in practice (see 4b): a large decay turns `gwidegree` into an in-2-star term.
+> - Main model, decay 1.4: BIC 1213, in-degree misfit (4a).
+> - Decay 0.5: worst structural model (BIC 1220, 3 outside, 5 with p < 0.05); misses shared partners as well as degree.
+> - Receiver-reported opponents: BIC 1230. Structure fits as well as the main model; the opponent term explains less.
+> - `dgwdsp`: did not converge. Not a candidate.
+
+**Which specification?**
+
+-   **Switzerland alone:** `gwidegree` with decay 3, or `istar(2)`. The two are indistinguishable on BIC and GOF. Both capture the hub (one actor named by 38 of 46) better than decay 1.4.
+-   **Four-country comparison:** keep the authors' decay 1.4. The paper's claim needs one specification in every network. Other decays made the DE, FR, and NL models degenerate (authors' footnote), and Markov stars run away on small, dense networks (3b).
+-   **Cost of that choice:** a worse fit for Switzerland, mainly in the in-degree distribution.
+-   **What does not change:** `gwidegree` is negative at every decay and `istar2` is positive. Both mean concentration, so H1 holds whichever specification we pick.
+-   **Lesson:** the best fit for one network and the best specification for a comparison are not the same thing. Report both, and say which one carries the argument.
 
 ------------------------------------------------------------------------
 
@@ -651,11 +831,12 @@ round(do.call(cbind, res), 3)
 > **What we see:**
 >
 > - Switching only the opponent label: CH 0.12 → 0.29 (median ×3.9), DE 0.13 → 0.29 (×4.4), FR 0.27 → 0.43 (×2.3).
-> - Gain is about 0.16–0.17 in all three countries. The raw gap in Section 0 was 0.29–0.36. About half of the raw gap is the opponent effect; the rest comes from other differences between opponent and non-opponent pairs (shared partners, reciprocity, prominent actors).
+> - Gain is about 0.16–0.17 in all three countries. The raw gap in Section 0 was 0.28–0.36. About half of the raw gap is the opponent effect; the rest comes from other differences between opponent and non-opponent pairs (shared partners, reciprocity, prominent actors).
 > - Absolute gain is similar across countries. Relative gain is not: about ×4 in CH and DE, ×2 in FR, because CH and DE start from a lower baseline (0.12 vs. 0.27).
 > - Consistent with H2: opposition raises collaboration more, in relative terms, in the consensus systems.
 > - FR is the least certain: its opponent coefficient is not significant, and these are point estimates without confidence intervals.
 > - NL is skipped. Its column comes from the authors' saved fit, where the opponent term is named `edgecov.oppNL`.
+
 ------------------------------------------------------------------------
 
 ## Session information
